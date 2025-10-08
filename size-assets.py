@@ -7,7 +7,7 @@ import numpy as np  # === NOVO: para composição rápida
 APP_TITLE = "Gerador de Chunks 2D (12 combinações com 'prainha')"
 REQ_SIZE = (1024, 1024)
 OUT_SMALL = (100, 100)  # resolução opcional de saída
-CORNER_RADIUS = 80
+CORNER_RADIUS = 300
 
 # === NOVO: parâmetros da prainha/ondulação
 SHORE_W = 26      # largura (px) da faixa de "areia"
@@ -229,6 +229,61 @@ def blend_wavy_cross(img_comp, major_img, minor_img, major_name, minor_name, odd
                 out[yb0:yb1, x] = MA[yb0:yb1, x]   # abaixo → MAJOR
             else:
                 out[yb0:yb1, x] = MI[yb0:yb1, x]   # abaixo é o ímpar → MINOR
+
+        # ----- QUINA ARREDONDADA (quarter-circle) -----
+    odd_is_left = odd_label in ("topleft","bottomleft")
+    odd_is_top  = odd_label in ("topleft","topright")
+
+    # interseção exata das duas curvas (meio da tile)
+    # posiciona o centro da quina para dentro do quadrante ímpar
+    OFFSET = 300 - SHORE_W // 2
+
+    if   odd_is_top  and odd_is_left:
+        x_c = hw - OFFSET
+        y_c = hh - OFFSET
+    elif odd_is_top  and not odd_is_left:
+        x_c = hw + OFFSET
+        y_c = hh - OFFSET
+    elif (not odd_is_top) and odd_is_left:
+        x_c = hw - OFFSET
+        y_c = hh + OFFSET
+    else:
+        x_c = hw + OFFSET
+        y_c = hh + OFFSET
+
+    R  = CORNER_RADIUS            # raio da quina arredondada
+    th = SHORE_W                  # espessura do traço (mesma do contorno)
+    x0 = max(0, x_c - (R + th))
+    x1 = min(w, x_c + (R + th))
+    y0 = max(0, y_c - (R + th))
+    y1 = min(h, y_c + (R + th))
+    if x1 > x0 and y1 > y0:
+        yy, xx = np.ogrid[y0:y1, x0:x1]
+        dist = np.sqrt((xx - x_c)**2 + (yy - y_c)**2)
+
+        # setor que deve receber o "cap" (lado do MINOR) — INVERTIDO
+        if   odd_is_top  and odd_is_left:
+            sector = (xx >= x_c) & (yy >= y_c)   # era <=,<=  → invertido
+        elif odd_is_top  and not odd_is_left:
+            sector = (xx <= x_c) & (yy >= y_c)   # era >=,<=  → invertido
+        elif (not odd_is_top) and odd_is_left:
+            sector = (xx >= x_c) & (yy <= y_c)   # era <=,>=  → invertido
+        else:
+            sector = (xx <= x_c) & (yy <= y_c)   # era >=,>=  → invertido
+        # vamos REESCREVER totalmente a região da quina → nada de “sobras” do L
+        area = sector & (dist <= (R + th))
+
+        # máscara do anel (traço), interior (lado MINOR) e exterior (lado MAJOR)
+        ring         = area & (np.abs(dist - R) <= th//2)
+        inside_minor = area & (dist <  (R - th//2))
+        outside_major= area & (dist >  (R + th//2))
+
+        sub = out[y0:y1, x0:x1]
+        # preenche lados corretos
+        sub[inside_minor]  = MI[y0:y1, x0:x1][inside_minor]   # lado do quadrante ímpar = MINOR
+        sub[outside_major] = MA[y0:y1, x0:x1][outside_major]  # fora do arco = MAJOR
+        sub[ring]          = (0, 0, 0, 255)                   # traço preto
+        out[y0:y1, x0:x1]  = sub
 
     return Image.fromarray(out, mode="RGBA")
 
