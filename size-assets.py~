@@ -230,6 +230,52 @@ def blend_wavy_cross(img_comp, major_img, minor_img, major_name, minor_name, odd
             else:
                 out[yb0:yb1, x] = MI[yb0:yb1, x]   # abaixo é o ímpar → MINOR
 
+        # ----- CAP ARREDONDADO NA QUINA -----
+    # Ponto de interseção das duas ondas no meio
+    odd_is_left = odd_label in ("topleft","bottomleft")
+    odd_is_top  = odd_label in ("topleft","topright")
+
+    # centro (x_c, y_c) próximo da quina verdadeira
+    x_c = hw + int(off_v[hh - 1 if odd_is_top else hh])
+    y_c = hh + int(off_h[hw - 1 if odd_is_left else hw])
+
+    R  = CORNER_RADIUS
+    th = SHORE_W  # espessura do traço; acompanha sua faixa preta
+
+    # recorte para não varrer a imagem inteira
+    x0 = max(0, x_c - (R + th))
+    x1 = min(w, x_c + (R + th))
+    y0 = max(0, y_c - (R + th))
+    y1 = min(h, y_c + (R + th))
+
+    if x1 > x0 and y1 > y0:
+        # grids locais
+        yy, xx = np.ogrid[y0:y1, x0:x1]
+        dist = np.sqrt((xx - x_c)**2 + (yy - y_c)**2)
+
+        # qual “lado” do círculo pertence ao quadrante ímpar
+        # (define o setor da pizza que é do MINOR)
+        if   odd_is_top  and odd_is_left:
+            inside_sector = (xx <= x_c) & (yy <= y_c)   # topo-esquerda
+        elif odd_is_top  and not odd_is_left:
+            inside_sector = (xx >= x_c) & (yy <= y_c)   # topo-direita
+        elif (not odd_is_top) and odd_is_left:
+            inside_sector = (xx <= x_c) & (yy >= y_c)   # baixo-esquerda
+        else:
+            inside_sector = (xx >= x_c) & (yy >= y_c)   # baixo-direita
+
+        # anel (traço) preto
+        ring = (dist >= R - th//2) & (dist <= R + th//2)
+        out[y0:y1, x0:x1][ring] = (0, 0, 0, 255)
+
+        # “recheios” dos dois lados do anel (mantém cor correta por lado)
+        inner = dist < (R - th//2)   # lado de dentro do anel
+        outer = dist > (R + th//2)   # lado de fora do anel
+
+        # MINOR do lado do quadrante ímpar; MAJOR do outro lado
+        out[y0:y1, x0:x1][inner & inside_sector] = MI[y0:y1, x0:x1][inner & inside_sector]
+        out[y0:y1, x0:x1][outer & inside_sector] = MA[y0:y1, x0:x1][outer & inside_sector]
+
     return Image.fromarray(out, mode="RGBA")
 
 # -------------------------------------------------
