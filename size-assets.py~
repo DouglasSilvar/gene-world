@@ -236,7 +236,7 @@ def blend_wavy_cross(img_comp, major_img, minor_img, major_name, minor_name, odd
 
     # interseção exata das duas curvas (meio da tile)
     # posiciona o centro da quina para dentro do quadrante ímpar
-    OFFSET = 400 - SHORE_W // 2
+    OFFSET = 300 - SHORE_W // 2
 
     if   odd_is_top  and odd_is_left:
         x_c = hw - OFFSET
