@@ -36,20 +36,32 @@ def is_black(color_rgba, threshold):
     # Compara apenas os 3 primeiros canais (R, G, B)
     return all(c <= threshold for c in color_rgba[:3])
 
+# ==============================================================================
+# --- LÓGICA DE CORREÇÃO DO GLITCH CENTRAL (INTEGRADA DO SCRIPT 2) ---
+# ==============================================================================
+def is_similar_color(color1_rgba, color2_rgba, tolerance):
+    """Verifica se duas cores RGBA são similares nos canais RGB."""
+    # CORREÇÃO 1: Converte para int() antes da subtração para evitar overflow
+    return all(abs(int(c1) - int(c2)) <= tolerance for c1, c2 in zip(color1_rgba[:3], color2_rgba[:3]))
+
+def is_black(color_rgba, threshold):
+    """Verifica se uma cor RGBA é considerada preta nos canais RGB."""
+    return all(c <= threshold for c in color_rgba[:3])
+
 def fix_central_glitch(img_to_fix: Image.Image) -> Image.Image:
     """
     Recebe uma imagem PIL (RGBA), corrige a falha central em um losango e
     retorna a imagem PIL corrigida.
     """
-    # Converte a imagem para um array NumPy para manipulação rápida de pixels
-    data = np.asarray(img_to_fix)
+    # CORREÇÃO 2: Adiciona .copy() para garantir que o array seja editável
+    data = np.asarray(img_to_fix).copy()
     height, width, _ = data.shape
     center_x, center_y = width // 2, height // 2
 
     # 1. Calcular o raio do losango em pixels
     diamond_radius = int(min(height, width) * DIAMOND_RADIUS_RATIO)
     if diamond_radius < 5:
-        return img_to_fix # Retorna a imagem original se for muito pequena para corrigir
+        return img_to_fix
 
     # 2. Encontrar a cor predominante no losango (ignorando a linha preta)
     start_x = max(0, center_x - diamond_radius)
@@ -60,14 +72,13 @@ def fix_central_glitch(img_to_fix: Image.Image) -> Image.Image:
     colors_in_roi = []
     for y in range(start_y, end_y):
         for x in range(start_x, end_x):
-            # Verifica se o pixel está dentro do losango usando a Distância de Manhattan
             if abs(x - center_x) + abs(y - center_y) <= diamond_radius:
                 pixel_color = tuple(data[y, x])
                 if not is_black(pixel_color, BLACK_THRESHOLD):
                     colors_in_roi.append(pixel_color)
 
     if not colors_in_roi:
-        return img_to_fix # Não há cores para analisar, retorna a original
+        return img_to_fix
 
     # Agrupa cores similares para encontrar a predominante
     color_buckets = {}
@@ -82,11 +93,14 @@ def fix_central_glitch(img_to_fix: Image.Image) -> Image.Image:
             color_buckets[color] = [color]
 
     # Calcula a cor média do maior grupo
+    if not color_buckets:
+        return img_to_fix # Retorna original se não achar cores
+
     dominant_color_list = max(color_buckets.values(), key=len)
     avg_r = np.mean([c[0] for c in dominant_color_list])
     avg_g = np.mean([c[1] for c in dominant_color_list])
     avg_b = np.mean([c[2] for c in dominant_color_list])
-    dominant_color = (int(avg_r), int(avg_g), int(avg_b), 255) # Adiciona Alpha 255
+    dominant_color = (int(avg_r), int(avg_g), int(avg_b), 255)
 
     # 3. Corrigir pixels dentro do losango
     for y in range(start_y, end_y):
@@ -95,7 +109,6 @@ def fix_central_glitch(img_to_fix: Image.Image) -> Image.Image:
                 current_pixel_color = tuple(data[y, x])
                 is_dom = is_similar_color(current_pixel_color, dominant_color, COLOR_TOLERANCE)
                 is_blk = is_black(current_pixel_color, BLACK_THRESHOLD)
-                # Se o pixel não for da cor dominante e nem for preto, pinte-o
                 if not is_dom and not is_blk:
                     data[y, x] = dominant_color
 

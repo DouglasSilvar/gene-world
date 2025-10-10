@@ -314,11 +314,9 @@ def generate():
         fname = f"threeparts-{major_name}-{odd_label}-{minor_name}.png"
         return out_img_fixed, fname
 
-    # 5-8) threeparts-A-oddpos-B (com correção automática)
     for oddpos in ["topleft", "topright", "bottomleft", "bottomright"]:
         outputs.append(build_threeparts(name_a, name_b, qa, qb, oddpos))
 
-    # 9-12) threeparts-B-oddpos-A (com correção automática)
     for oddpos in ["topleft", "topright", "bottomleft", "bottomright"]:
         outputs.append(build_threeparts(name_b, name_a, qb, qa, oddpos))
 
@@ -329,7 +327,6 @@ def generate():
         img_to_save = img
         if downscale_var.get():
             img_to_save = img.resize(OUT_SMALL, Image.LANCZOS)
-            out_path = os.path.join(out_dir, f"100x100-{fname}")
         img_to_save.save(out_path, format="PNG")
         saved_count += 1
 
