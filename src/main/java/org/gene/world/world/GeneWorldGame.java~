@@ -5,12 +5,13 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.math.Matrix4;
+import org.gene.world.chunks.enums.ChunkType;
 
 public class GeneWorldGame extends ApplicationAdapter {
-    // ... (constantes iguais) ...
-    public static final int SCREEN_SIZE = 1000;
-    public static final int CHUNK_SIZE  = 100;
-    public static final int CHUNKS_PER_AXIS = SCREEN_SIZE / CHUNK_SIZE;
+
+    public static final int SCREEN_SIZE = 1000;   // px
+    public static final int CHUNK_SIZE  = 100;    // px por chunk (100x100)
+    public static final int CHUNKS_PER_AXIS = SCREEN_SIZE / CHUNK_SIZE; // 10
 
     private SpriteBatch batch;
     private World world;
@@ -18,10 +19,10 @@ public class GeneWorldGame extends ApplicationAdapter {
     @Override
     public void create() {
         batch = new SpriteBatch();
+        // 🔑 garante espaço de coordenadas exatamente 0..1000 x 0..1000 (pixel-perfect)
         batch.setProjectionMatrix(new Matrix4().setToOrtho2D(0, 0, SCREEN_SIZE, SCREEN_SIZE));
 
-        // A criação do mundo não precisa mais do tipo, pois ele será gerado proceduralmente
-        world = new World(CHUNKS_PER_AXIS, CHUNKS_PER_AXIS, CHUNK_SIZE);
+        world = new World(CHUNKS_PER_AXIS, CHUNKS_PER_AXIS, CHUNK_SIZE, ChunkType.GROUND);
     }
 
     @Override

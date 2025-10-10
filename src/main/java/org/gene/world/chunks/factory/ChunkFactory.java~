@@ -1,12 +1,12 @@
 package org.gene.world.chunks.factory;
 
-import org.gene.world.chunks.enums.Biome;
 import org.gene.world.chunks.enums.TileType;
 import org.gene.world.chunks.model.ChunkModel;
 import org.gene.world.chunks.model.TileImageChunkModel;
 
 public class ChunkFactory {
-    public static ChunkModel modelFor(TileType type, Biome primary, Biome secondary) {
-        return new TileImageChunkModel(type, primary, secondary);
+    public static ChunkModel modelFor(TileType type) {
+        // A factory agora só precisa criar um modelo de imagem para o tipo de tile solicitado.
+        return new TileImageChunkModel(type);
     }
 }
