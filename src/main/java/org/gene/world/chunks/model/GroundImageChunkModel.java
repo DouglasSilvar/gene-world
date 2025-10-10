@@ -17,7 +17,7 @@ public class GroundImageChunkModel implements ChunkModel {
 
     public GroundImageChunkModel() {
         if (TILE == null) {
-            FileHandle fh = Gdx.files.internal("assets/ground.png");
+            FileHandle fh = Gdx.files.internal("assets/grass.png");
             TILE = new Pixmap(fh);
             TW = TILE.getWidth();
             TH = TILE.getHeight();
