@@ -1,0 +1,149 @@
+import tkinter as tk
+from tkinter import filedialog
+from PIL import Image
+import numpy as np
+import os
+from collections import Counter
+
+# --- CONFIGURAÇÕES ---
+# Prefixo para os arquivos corrigidos.
+OUTPUT_PREFIX = "fixed_v3_"
+# Raio do losango central como uma porcentagem da menor dimensão da imagem (largura ou altura).
+# Um valor de 0.1 (10%) é um bom ponto de partida. Ajuste conforme necessário.
+# Este valor substitui o antigo CENTER_SQUARE_PERCENTAGE_SIDE.
+DIAMOND_RADIUS_RATIO = 0.1
+# Tolerância para considerar cores similares (para a linha preta e para a cor de preenchimento)
+COLOR_TOLERANCE = 20
+BLACK_THRESHOLD = 50
+
+# --------------------
+
+def is_similar_color(color1, color2, tolerance):
+    """Verifica se duas cores são similares dentro de uma tolerância."""
+    return all(abs(c1 - c2) <= tolerance for c1, c2 in zip(color1, color2))
+
+def is_black(color, threshold):
+    """Verifica se uma cor é considerada preta."""
+    return all(c <= threshold for c in color)
+
+def fix_image_glitch_v3(image_path):
+    """
+    Abre uma imagem, analisa uma área em forma de losango (quadrado rotacionado) no centro,
+    identifica a cor predominante e corrige os pixels com falha dentro dessa área.
+    """
+    try:
+        print(f"Processando: {os.path.basename(image_path)}...")
+        img = Image.open(image_path).convert('RGB')
+        data = np.array(img)
+
+        height, width, _ = data.shape
+        center_x, center_y = width // 2, height // 2
+
+        # 1. Calcular o raio do losango em pixels
+        diamond_radius = int(min(height, width) * DIAMOND_RADIUS_RATIO)
+
+        if diamond_radius < 5:
+            print(f"  [AVISO] Raio do losango muito pequeno para {os.path.basename(image_path)}. Pulando.")
+            return
+
+        print(f"  Analisando losango com raio de {diamond_radius} pixels.")
+
+        # 2. Encontrar a cor predominante no losango (ROI)
+        # Definir o quadrado que contém o losango (bounding box)
+        start_x = max(0, center_x - diamond_radius)
+        end_x = min(width, center_x + diamond_radius + 1)
+        start_y = max(0, center_y - diamond_radius)
+        end_y = min(height, center_y + diamond_radius + 1)
+
+        colors_in_roi = []
+        for y in range(start_y, end_y):
+            for x in range(start_x, end_x):
+                # A MÁGICA ACONTECE AQUI: checa se o pixel está dentro do losango
+                # usando a Distância de Manhattan.
+                if abs(x - center_x) + abs(y - center_y) <= diamond_radius:
+                    pixel_color = tuple(data[y, x])
+                    if not is_black(pixel_color, BLACK_THRESHOLD):
+                        colors_in_roi.append(pixel_color)
+
+        if not colors_in_roi:
+            print(f"  [AVISO] Nenhuma cor válida encontrada no losango para {os.path.basename(image_path)}. Pulando.")
+            return
+
+        # Agrupa cores similares para encontrar a predominante (lógica mantida da v2)
+        color_buckets = {}
+        for color in colors_in_roi:
+            found_bucket = False
+            for bucket_key in color_buckets:
+                if is_similar_color(color, bucket_key, COLOR_TOLERANCE):
+                    color_buckets[bucket_key].append(color)
+                    found_bucket = True
+                    break
+            if not found_bucket:
+                color_buckets[color] = [color]
+
+        max_count = 0
+        dominant_color = None
+        for bucket_key, colors_list in color_buckets.items():
+            if len(colors_list) > max_count:
+                max_count = len(colors_list)
+                dominant_color = tuple(int(np.mean([c[i] for c in colors_list])) for i in range(3))
+
+        if dominant_color is None:
+            print(f"  [AVISO] Não foi possível determinar a cor predominante no losango para {os.path.basename(image_path)}. Pulando.")
+            return
+
+        print(f"  Cor predominante identificada: {dominant_color}")
+
+        # 3. Corrigir pixels dentro do losango que não são a cor predominante nem preto
+        for y in range(start_y, end_y):
+            for x in range(start_x, end_x):
+                # Usa a mesma condição da Distância de Manhattan para corrigir
+                if abs(x - center_x) + abs(y - center_y) <= diamond_radius:
+                    current_pixel_color = tuple(data[y, x])
+                    if not is_similar_color(current_pixel_color, dominant_color, COLOR_TOLERANCE) and \
+                            not is_black(current_pixel_color, BLACK_THRESHOLD):
+                        data[y, x] = dominant_color
+
+        # 4. Salvar a imagem corrigida
+        corrected_img = Image.fromarray(data)
+
+        path, name = os.path.split(image_path)
+        new_name = f"{OUTPUT_PREFIX}{name}"
+        output_path = os.path.join(path, new_name)
+
+        corrected_img.save(output_path)
+        print(f"  [SUCESSO] Imagem salva como: {new_name}")
+
+    except Exception as e:
+        print(f"  [ERRO] Ocorreu um erro ao processar {os.path.basename(image_path)}: {e}")
+
+
+def main():
+    """
+    Função principal que abre a interface para seleção de arquivos e
+    inicia o processo de correção.
+    """
+    root = tk.Tk()
+    root.withdraw()
+
+    print("Por favor, selecione os arquivos de imagem para corrigir (versão 3 - Losango).")
+
+    file_paths = filedialog.askopenfilenames(
+        title="Selecione as imagens com falha",
+        filetypes=[("Imagens", "*.png *.jpg *.jpeg *.bmp"), ("Todos os arquivos", "*.*")]
+    )
+
+    if not file_paths:
+        print("Nenhum arquivo selecionado. Encerrando.")
+        return
+
+    print(f"\n{len(file_paths)} arquivo(s) selecionado(s). Iniciando correção...\n")
+
+    for path in file_paths:
+        fix_image_glitch_v3(path)
+
+    print("\nProcesso concluído!")
+
+
+if __name__ == "__main__":
+    main()

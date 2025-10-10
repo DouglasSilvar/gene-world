@@ -277,9 +277,9 @@ def blend_wavy_cross(img_comp, major_img, minor_img, major_name, minor_name, odd
 def generate():
     img_a_path = entry_img_a.get().strip()
     img_b_path = entry_img_b.get().strip()
-    name_a = safe_name(entry_name_a.get() or "imgA")
-    name_b = safe_name(entry_name_b.get() or "imgB")
-    out_dir = entry_out.get().strip()
+    name_a = safe_name(os.path.splitext(os.path.basename(img_a_path))[0])
+    name_b = safe_name(os.path.splitext(os.path.basename(img_b_path))[0])
+    out_dir = os.path.dirname(img_a_path)
 
     if not os.path.isfile(img_a_path) or not os.path.isfile(img_b_path):
         messagebox.showerror("Erro", "Selecione os arquivos de imagem A e B.")
@@ -336,8 +336,8 @@ def generate():
         base = compose(parts["q1"], parts["q2"], parts["q3"], parts["q4"])
 
         # === NOVO: aplica prainha ondulada nas duas linhas centrais
-        major_img = img_a if major_name == safe_name(entry_name_a.get() or "imgA") else img_b
-        minor_img = img_a if major_name != safe_name(entry_name_a.get() or "imgA") else img_b
+        major_img = img_a if major_name == name_a else img_b
+        minor_img = img_b if major_name == name_a else img_a
         out_img = blend_wavy_cross(base, major_img, minor_img, major_name, minor_name, odd_label)
 
         fname = f"threeparts-{major_name}-{odd_label}-{minor_name}.png"
@@ -383,9 +383,9 @@ entry_img_a = tk.Entry(frm, width=55)
 entry_img_a.grid(row=0, column=1, padx=pad, pady=pad)
 tk.Button(frm, text="Escolher...", command=lambda: browse_img(entry_img_a)).grid(row=0, column=2, padx=pad, pady=pad)
 
-tk.Label(frm, text="Nome A (ex.: terra):").grid(row=1, column=0, sticky="w", padx=pad, pady=pad)
-entry_name_a = tk.Entry(frm, width=20)
-entry_name_a.grid(row=1, column=1, sticky="w", padx=pad, pady=pad)
+# tk.Label(frm, text="Nome A (ex.: terra):").grid(row=1, column=0, sticky="w", padx=pad, pady=pad)
+# entry_name_a = tk.Entry(frm, width=20)
+# entry_name_a.grid(row=1, column=1, sticky="w", padx=pad, pady=pad)
 
 # Imagem B
 tk.Label(frm, text="Imagem B:").grid(row=2, column=0, sticky="w", padx=pad, pady=pad)
@@ -393,15 +393,15 @@ entry_img_b = tk.Entry(frm, width=55)
 entry_img_b.grid(row=2, column=1, padx=pad, pady=pad)
 tk.Button(frm, text="Escolher...", command=lambda: browse_img(entry_img_b)).grid(row=2, column=2, padx=pad, pady=pad)
 
-tk.Label(frm, text="Nome B (ex.: agua):").grid(row=3, column=0, sticky="w", padx=pad, pady=pad)
-entry_name_b = tk.Entry(frm, width=20)
-entry_name_b.grid(row=3, column=1, sticky="w", padx=pad, pady=pad)
+# tk.Label(frm, text="Nome B (ex.: agua):").grid(row=3, column=0, sticky="w", padx=pad, pady=pad)
+# entry_name_b = tk.Entry(frm, width=20)
+# entry_name_b.grid(row=3, column=1, sticky="w", padx=pad, pady=pad)
 
 # Saída
-tk.Label(frm, text="Pasta de saída:").grid(row=4, column=0, sticky="w", padx=pad, pady=pad)
-entry_out = tk.Entry(frm, width=55)
-entry_out.grid(row=4, column=1, padx=pad, pady=pad)
-tk.Button(frm, text="Escolher...", command=lambda: browse_out()).grid(row=4, column=2, padx=pad, pady=pad)
+# tk.Label(frm, text="Pasta de saída:").grid(row=4, column=0, sticky="w", padx=pad, pady=pad)
+# entry_out = tk.Entry(frm, width=55)
+# entry_out.grid(row=4, column=1, padx=pad, pady=pad)
+# tk.Button(frm, text="Escolher...", command=lambda: browse_out()).grid(row=4, column=2, padx=pad, pady=pad)
 
 # Botão principal
 btn = tk.Button(frm, text="Gerar 12 imagens", width=20, command=generate)
@@ -429,11 +429,5 @@ def browse_img(entry):
     if path:
         entry.delete(0, tk.END)
         entry.insert(0, path)
-
-def browse_out():
-    path = filedialog.askdirectory(title="Selecione a pasta de saída")
-    if path:
-        entry_out.delete(0, tk.END)
-        entry_out.insert(0, path)
 
 root.mainloop()

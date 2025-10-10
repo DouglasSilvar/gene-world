@@ -155,88 +155,22 @@ def blend_wavy_cross(img_comp, major_img, minor_img, major_name, minor_name, odd
     hw, hh = w // 2, h // 2
     out = np.asarray(img_comp).copy()
 
-    # Cores de praia vindas do major (faixas internas perto do centro)
-    # shore_v_color = _avg_edge_color_rgba(major_img, side="right", span=12)
-    # shore_h_color = _avg_edge_color_rgba(major_img, side="bottom", span=12)
     shore_v_color = (0, 0, 0, 255)
     shore_h_color = (0, 0, 0, 255)
 
     rng_v = _rng_from_names(major_name, minor_name)
-    rng_h = _rng_from_names(minor_name, major_name)  # troca ordem p/ variar um pouco
-    off_v = _periodic_curve(h, WAVE_PERIODS, WAVE_AMP, rng_v)  # vertical: função de y
-    off_h = _periodic_curve(w, WAVE_PERIODS, WAVE_AMP, rng_h)  # horizontal: função de x
+    rng_h = _rng_from_names(minor_name, major_name)
+    off_v = _periodic_curve(h, WAVE_PERIODS, WAVE_AMP, rng_v)
+    off_h = _periodic_curve(w, WAVE_PERIODS, WAVE_AMP, rng_h)
     shore_half = SHORE_W // 2
 
-    # --- VERTICAL (meia altura somente do lado do quadrante ímpar)
-    PAD = max(4, SHORE_W // 2)  # largura dos "recheios" colados à faixa
-
-    # --- VERTICAL (só metade que encosta no quadrante ímpar)
-    y_start, y_end = (0, hh) if odd_label in ("topleft","topright") else (hh, h)
-    odd_is_left = odd_label in ("topleft","bottomleft")
-
-    # fontes alinhadas (mesmo tamanho/coords):
-    MA = np.asarray(major_img)   # major em todo o canvas
-    MI = np.asarray(minor_img)   # minor em todo o canvas (usaremos só junto à curva)
-
-    for y in range(y_start, y_end):
-        xb = hw + int(off_v[y])
-        xs0 = max(0, xb - shore_half)
-        xs1 = min(w, xb + shore_half + (SHORE_W % 2))
-
-        # banda esquerda colada à faixa (garante cor 100% do lado esquerdo da curva)
-        xl0 = max(0, xs0 - PAD); xl1 = xs0
-        if xl1 > xl0:
-            if odd_is_left:
-                out[y, xl0:xl1] = MI[y, xl0:xl1]   # lado do quadrante ímpar → MINOR
-            else:
-                out[y, xl0:xl1] = MA[y, xl0:xl1]   # lado oposto → MAJOR
-
-        # faixa de prainha
-        out[y, xs0:xs1] = shore_v_color
-
-        # banda direita colada à faixa
-        xr0 = xs1; xr1 = min(w, xs1 + PAD)
-        if xr1 > xr0:
-            if odd_is_left:
-                out[y, xr0:xr1] = MA[y, xr0:xr1]   # lado direito → MAJOR
-            else:
-                out[y, xr0:xr1] = MI[y, xr0:xr1]   # lado direito é o ímpar → MINOR
-
-    # --- HORIZONTAL (só metade que encosta no quadrante ímpar)
-    x_start, x_end = (0, hw) if odd_label in ("topleft","bottomleft") else (hw, w)
-    odd_is_top = odd_label in ("topleft","topright")
-
-    for x in range(x_start, x_end):
-        yb = hh + int(off_h[x])
-        ys0 = max(0, yb - shore_half)
-        ys1 = min(h, yb + shore_half + (SHORE_W % 2))
-
-        # banda superior colada à faixa
-        yt0 = max(0, ys0 - PAD); yt1 = ys0
-        if yt1 > yt0:
-            if odd_is_top:
-                out[yt0:yt1, x] = MI[yt0:yt1, x]   # acima da curva → MINOR
-            else:
-                out[yt0:yt1, x] = MA[yt0:yt1, x]   # acima → MAJOR
-
-        # faixa de prainha
-        out[ys0:ys1, x] = shore_h_color
-
-        # banda inferior colada à faixa
-        yb0 = ys1; yb1 = min(h, ys1 + PAD)
-        if yb1 > yb0:
-            if odd_is_top:
-                out[yb0:yb1, x] = MA[yb0:yb1, x]   # abaixo → MAJOR
-            else:
-                out[yb0:yb1, x] = MI[yb0:yb1, x]   # abaixo é o ímpar → MINOR
-
-        # ----- QUINA ARREDONDADA (quarter-circle) -----
+    # ----- ### MUDANÇA 1: CALCULAR O CENTRO DA QUINA PRIMEIRO ### -----
+    # Movemos este bloco para o início da função.
+    # Ele define o ponto exato onde as linhas retas devem parar e a curva começar.
     odd_is_left = odd_label in ("topleft","bottomleft")
     odd_is_top  = odd_label in ("topleft","topright")
 
-    # interseção exata das duas curvas (meio da tile)
-    # posiciona o centro da quina para dentro do quadrante ímpar
-    OFFSET = 300 - SHORE_W // 2
+    OFFSET = CORNER_RADIUS - SHORE_W // 2
 
     if   odd_is_top  and odd_is_left:
         x_c = hw - OFFSET
@@ -251,8 +185,61 @@ def blend_wavy_cross(img_comp, major_img, minor_img, major_name, minor_name, odd
         x_c = hw + OFFSET
         y_c = hh + OFFSET
 
-    R  = CORNER_RADIUS            # raio da quina arredondada
-    th = SHORE_W                  # espessura do traço (mesma do contorno)
+    # -------------------------------------------------------------------
+
+    PAD = max(4, SHORE_W // 2)
+    MA = np.asarray(major_img)
+    MI = np.asarray(minor_img)
+
+    # --- VERTICAL (só metade que encosta no quadrante ímpar)
+    y_start, y_end = (0, hh) if odd_is_top else (hh, h)
+
+    # ### MUDANÇA 2: LIMITAR O ALCANCE DO LOOP VERTICAL ###
+    # O loop agora para antes de entrar na área da quina, usando y_c como limite.
+    y_range = range(y_start, y_c) if odd_is_top else range(y_c, y_end)
+
+    for y in y_range:
+        xb = hw + int(off_v[y])
+        xs0 = max(0, xb - shore_half)
+        xs1 = min(w, xb + shore_half + (SHORE_W % 2))
+
+        xl0 = max(0, xs0 - PAD); xl1 = xs0
+        if xl1 > xl0:
+            out[y, xl0:xl1] = MI[y, xl0:xl1] if odd_is_left else MA[y, xl0:xl1]
+
+        out[y, xs0:xs1] = shore_v_color
+
+        xr0 = xs1; xr1 = min(w, xs1 + PAD)
+        if xr1 > xr0:
+            out[y, xr0:xr1] = MA[y, xr0:xr1] if odd_is_left else MI[y, xr0:xr1]
+
+    # --- HORIZONTAL (só metade que encosta no quadrante ímpar)
+    x_start, x_end = (0, hw) if odd_is_left else (hw, w)
+
+    # ### MUDANÇA 3: LIMITAR O ALCANCE DO LOOP HORIZONTAL ###
+    # O loop agora para antes de entrar na área da quina, usando x_c como limite.
+    x_range = range(x_start, x_c) if odd_is_left else range(x_c, x_end)
+
+    for x in x_range:
+        yb = hh + int(off_h[x])
+        ys0 = max(0, yb - shore_half)
+        ys1 = min(h, yb + shore_half + (SHORE_W % 2))
+
+        yt0 = max(0, ys0 - PAD); yt1 = ys0
+        if yt1 > yt0:
+            out[yt0:yt1, x] = MI[yt0:yt1, x] if odd_is_top else MA[yt0:yt1, x]
+
+        out[ys0:ys1, x] = shore_h_color
+
+        yb0 = ys1; yb1 = min(h, ys1 + PAD)
+        if yb1 > yb0:
+            out[yb0:yb1, x] = MA[yb0:yb1, x] if odd_is_top else MI[yb0:yb1, x]
+
+    # ----- QUINA ARREDONDADA (agora desenhada em uma área "limpa") -----
+    # Esta parte do código continua a mesma, mas agora funciona corretamente
+    # porque as linhas retas não estão mais "por baixo" dela.
+    R  = CORNER_RADIUS
+    th = SHORE_W
     x0 = max(0, x_c - (R + th))
     x1 = min(w, x_c + (R + th))
     y0 = max(0, y_c - (R + th))
@@ -261,28 +248,25 @@ def blend_wavy_cross(img_comp, major_img, minor_img, major_name, minor_name, odd
         yy, xx = np.ogrid[y0:y1, x0:x1]
         dist = np.sqrt((xx - x_c)**2 + (yy - y_c)**2)
 
-        # setor que deve receber o "cap" (lado do MINOR) — INVERTIDO
         if   odd_is_top  and odd_is_left:
-            sector = (xx >= x_c) & (yy >= y_c)   # era <=,<=  → invertido
+            sector = (xx >= x_c) & (yy >= y_c)
         elif odd_is_top  and not odd_is_left:
-            sector = (xx <= x_c) & (yy >= y_c)   # era >=,<=  → invertido
+            sector = (xx <= x_c) & (yy >= y_c)
         elif (not odd_is_top) and odd_is_left:
-            sector = (xx >= x_c) & (yy <= y_c)   # era <=,>=  → invertido
+            sector = (xx >= x_c) & (yy <= y_c)
         else:
-            sector = (xx <= x_c) & (yy <= y_c)   # era >=,>=  → invertido
-        # vamos REESCREVER totalmente a região da quina → nada de “sobras” do L
+            sector = (xx <= x_c) & (yy <= y_c)
+
         area = sector & (dist <= (R + th))
 
-        # máscara do anel (traço), interior (lado MINOR) e exterior (lado MAJOR)
-        ring         = area & (np.abs(dist - R) <= th//2)
-        inside_minor = area & (dist <  (R - th//2))
-        outside_major= area & (dist >  (R + th//2))
+        ring          = area & (np.abs(dist - R) <= th//2)
+        inside_minor  = area & (dist <  (R - th//2))
+        outside_major = area & (dist >  (R + th//2))
 
         sub = out[y0:y1, x0:x1]
-        # preenche lados corretos
-        sub[inside_minor]  = MI[y0:y1, x0:x1][inside_minor]   # lado do quadrante ímpar = MINOR
-        sub[outside_major] = MA[y0:y1, x0:x1][outside_major]  # fora do arco = MAJOR
-        sub[ring]          = (0, 0, 0, 255)                   # traço preto
+        sub[inside_minor]  = MI[y0:y1, x0:x1][inside_minor]
+        sub[outside_major] = MA[y0:y1, x0:x1][outside_major]
+        sub[ring]          = (0, 0, 0, 255)
         out[y0:y1, x0:x1]  = sub
 
     return Image.fromarray(out, mode="RGBA")
@@ -293,9 +277,9 @@ def blend_wavy_cross(img_comp, major_img, minor_img, major_name, minor_name, odd
 def generate():
     img_a_path = entry_img_a.get().strip()
     img_b_path = entry_img_b.get().strip()
-    name_a = safe_name(entry_name_a.get() or "imgA")
-    name_b = safe_name(entry_name_b.get() or "imgB")
-    out_dir = entry_out.get().strip()
+    name_a = safe_name(os.path.splitext(os.path.basename(img_a_path))[0])
+    name_b = safe_name(os.path.splitext(os.path.basename(img_b_path))[0])
+    out_dir = os.path.dirname(img_a_path)
 
     if not os.path.isfile(img_a_path) or not os.path.isfile(img_b_path):
         messagebox.showerror("Erro", "Selecione os arquivos de imagem A e B.")
@@ -399,9 +383,9 @@ entry_img_a = tk.Entry(frm, width=55)
 entry_img_a.grid(row=0, column=1, padx=pad, pady=pad)
 tk.Button(frm, text="Escolher...", command=lambda: browse_img(entry_img_a)).grid(row=0, column=2, padx=pad, pady=pad)
 
-tk.Label(frm, text="Nome A (ex.: terra):").grid(row=1, column=0, sticky="w", padx=pad, pady=pad)
-entry_name_a = tk.Entry(frm, width=20)
-entry_name_a.grid(row=1, column=1, sticky="w", padx=pad, pady=pad)
+# tk.Label(frm, text="Nome A (ex.: terra):").grid(row=1, column=0, sticky="w", padx=pad, pady=pad)
+# entry_name_a = tk.Entry(frm, width=20)
+# entry_name_a.grid(row=1, column=1, sticky="w", padx=pad, pady=pad)
 
 # Imagem B
 tk.Label(frm, text="Imagem B:").grid(row=2, column=0, sticky="w", padx=pad, pady=pad)
@@ -409,15 +393,15 @@ entry_img_b = tk.Entry(frm, width=55)
 entry_img_b.grid(row=2, column=1, padx=pad, pady=pad)
 tk.Button(frm, text="Escolher...", command=lambda: browse_img(entry_img_b)).grid(row=2, column=2, padx=pad, pady=pad)
 
-tk.Label(frm, text="Nome B (ex.: agua):").grid(row=3, column=0, sticky="w", padx=pad, pady=pad)
-entry_name_b = tk.Entry(frm, width=20)
-entry_name_b.grid(row=3, column=1, sticky="w", padx=pad, pady=pad)
+# tk.Label(frm, text="Nome B (ex.: agua):").grid(row=3, column=0, sticky="w", padx=pad, pady=pad)
+# entry_name_b = tk.Entry(frm, width=20)
+# entry_name_b.grid(row=3, column=1, sticky="w", padx=pad, pady=pad)
 
 # Saída
-tk.Label(frm, text="Pasta de saída:").grid(row=4, column=0, sticky="w", padx=pad, pady=pad)
-entry_out = tk.Entry(frm, width=55)
-entry_out.grid(row=4, column=1, padx=pad, pady=pad)
-tk.Button(frm, text="Escolher...", command=lambda: browse_out()).grid(row=4, column=2, padx=pad, pady=pad)
+# tk.Label(frm, text="Pasta de saída:").grid(row=4, column=0, sticky="w", padx=pad, pady=pad)
+# entry_out = tk.Entry(frm, width=55)
+# entry_out.grid(row=4, column=1, padx=pad, pady=pad)
+# tk.Button(frm, text="Escolher...", command=lambda: browse_out()).grid(row=4, column=2, padx=pad, pady=pad)
 
 # Botão principal
 btn = tk.Button(frm, text="Gerar 12 imagens", width=20, command=generate)
@@ -445,11 +429,5 @@ def browse_img(entry):
     if path:
         entry.delete(0, tk.END)
         entry.insert(0, path)
-
-def browse_out():
-    path = filedialog.askdirectory(title="Selecione a pasta de saída")
-    if path:
-        entry_out.delete(0, tk.END)
-        entry_out.insert(0, path)
 
 root.mainloop()
