@@ -12,6 +12,63 @@
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+        <!-- Trave versões aqui (estas funcionam bem juntas) -->
+        <libgdx.version>1.12.1</libgdx.version>
+        <gdx.ai.version>1.8.2</gdx.ai.version>
+        <artemis.version>2.3.0</artemis.version>
     </properties>
 
+    <dependencies>
+        <!-- libGDX core -->
+        <dependency>
+            <groupId>com.badlogicgames.gdx</groupId>
+            <artifactId>gdx</artifactId>
+            <version>${libgdx.version}</version>
+        </dependency>
+
+        <!-- Desktop backend LWJGL3 -->
+        <dependency>
+            <groupId>com.badlogicgames.gdx</groupId>
+            <artifactId>gdx-backend-lwjgl3</artifactId>
+            <version>${libgdx.version}</version>
+        </dependency>
+
+        <!-- Nativos desktop (OpenGL) -->
+        <dependency>
+            <groupId>com.badlogicgames.gdx</groupId>
+            <artifactId>gdx-platform</artifactId>
+            <version>${libgdx.version}</version>
+            <classifier>natives-desktop</classifier>
+        </dependency>
+
+        <!-- gdx-ai (tem utilitários, grafos e A*) -->
+        <dependency>
+            <groupId>com.badlogicgames.gdx</groupId>
+            <artifactId>gdx-ai</artifactId>
+            <version>${gdx.ai.version}</version>
+        </dependency>
+
+        <!-- Artemis-ODB (ECS) -->
+        <dependency>
+            <groupId>net.onedaybeard.artemis</groupId>
+            <artifactId>artemis-odb</artifactId>
+            <version>${artemis.version}</version>
+        </dependency>
+        
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- Rodar a classe main com mvn exec:java -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.2.0</version>
+                <configuration>
+                    <mainClass>org.example.gene.world.desktop.DesktopLauncher</mainClass>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 </project>
